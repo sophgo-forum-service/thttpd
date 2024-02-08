@@ -244,6 +244,20 @@ tmr_mstimeout( struct timeval* nowP )
     return msecs;
     }
 
+void
+tmr_calibrate( struct timeval* nowP )
+{
+	int h;
+    Timer* t;
+    Timer* next;
+
+	for ( h = 0; h < HASH_SIZE; ++h )
+	for ( t = timers[h]; t != (Timer*) 0; t = next )
+	{
+		t->time.tv_sec = nowP->tv_sec;
+		t->time.tv_usec = nowP->tv_usec;
+	}
+}
 
 void
 tmr_run( struct timeval* nowP )
@@ -256,6 +270,15 @@ tmr_run( struct timeval* nowP )
 	for ( t = timers[h]; t != (Timer*) 0; t = next )
 	    {
 	    next = t->next;
+
+		if (nowP->tv_sec > t->time.tv_sec + 3600) {
+			syslog( LOG_NOTICE, "time jump?!" );
+			tmr_calibrate(nowP);
+		}
+		else if (nowP->tv_sec + 3600 < t->time.tv_sec ) {
+			syslog( LOG_NOTICE, "time rollback?!" );
+			tmr_calibrate(nowP);
+		}
 	    /* Since the lists are sorted, as soon as we find a timer
 	    ** that isn't ready yet, we can go on to the next list.
 	    */
