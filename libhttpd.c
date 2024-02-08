@@ -55,6 +55,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <netinet/tcp.h>
+#include <crypt.h>
 
 #ifdef HAVE_OSRELDATE_H
 #include <osreldate.h>
