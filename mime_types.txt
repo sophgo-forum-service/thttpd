@@ -65,6 +65,7 @@ jpe	image/jpeg
 jpeg	image/jpeg
 jpg	image/jpeg
 js	application/x-javascript
+wasm    application/wasm
 kar	audio/midi
 kml	application/vnd.google-earth.kml+xml
 kmz	application/vnd.google-earth.kmz
