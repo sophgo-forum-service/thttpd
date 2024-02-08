@@ -54,6 +54,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <netinet/tcp.h>
 
 #ifdef HAVE_OSRELDATE_H
 #include <osreldate.h>
@@ -3273,6 +3274,9 @@ cgi_interpose_output( httpd_conn* hc, int rfd )
     ** be blocking, but we might as well be sure.
     */
     httpd_clear_ndelay( hc->conn_fd );
+
+    int flags =1;
+    setsockopt(hc->conn_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags));
 
     /* Slurp in all headers. */
     headers_size = 0;

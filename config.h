@@ -75,7 +75,7 @@
 ** or whatever.  If you don't want any limit, comment this out, but that's
 ** probably a really bad idea.
 */
-#define CGI_TIMELIMIT 30
+#define CGI_TIMELIMIT 300
 
 /* CONFIGURE: Maximum number of simultaneous CGI programs allowed.
 ** If this many are already running, then attempts to run more will
@@ -90,7 +90,7 @@
 /* CONFIGURE: How many seconds to allow for reading the initial request
 ** on a new connection.
 */
-#define IDLE_READ_TIMELIMIT 60
+#define IDLE_READ_TIMELIMIT 300
 
 /* CONFIGURE: How many seconds before an idle connection gets closed.
 */
@@ -229,9 +229,7 @@
 ** without having to give the -P command line flag.  You can still disable
 ** it at runtime with the -noP flag.
 */
-#ifdef notdef
 #define ALWAYS_GLOBAL_PASSWD
-#endif
 
 /* CONFIGURE: When started as root, the default username to switch to after
 ** initializing.  If this user (or the one specified by the -u flag) does
@@ -276,7 +274,7 @@
 
 /* CONFIGURE: $PATH to use for CGI programs.
 */
-#define CGI_PATH "/usr/local/bin:/usr/ucb:/bin:/usr/bin"
+#define CGI_PATH "/bin:/sbin:/usr/bin:/usr/sbin"
 
 /* CONFIGURE: If defined, $LD_LIBRARY_PATH to use for CGI programs.
 */
