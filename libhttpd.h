@@ -35,11 +35,20 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* End of #ifdef __cplusplus */
+
+#if 0
 #if defined(AF_INET6) && defined(IN6_IS_ADDR_V4MAPPED)
 #define USE_IPV6
 #endif
-
+#endif
 
 /* A few convenient defines. */
 
@@ -287,5 +296,20 @@ int httpd_write_fully( int fd, const char* buf, size_t nbytes );
 
 /* Generate debugging statistics syslog message. */
 void httpd_logstats( long secs );
+
+/* add by CViTek, for handle cgi. Sam, 2020-12-14 */
+void strdecode( char* to, char* from );
+
+void add_response( httpd_conn* hc, char* str );
+
+typedef int (*FUNC_CGI_HANDLE)( httpd_conn* hc );
+int CVI_THTTPD_RegisterCgiHandle(FUNC_CGI_HANDLE func_cgi_handle);
+/* end of add */
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* End of #ifdef __cplusplus */
 
 #endif /* _LIBHTTPD_H_ */

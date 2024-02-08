@@ -68,6 +68,7 @@
 /* When virtual hosting, enable the central directory on every host: */
 #define CGI_PATTERN "/*/cgi-bin/*"
 #endif
+#define INTERNAL_CGI_PATTERN "cgi/"
 
 /* CONFIGURE: How many seconds to allow CGI programs to run before killing
 ** them.  This is in case someone writes a CGI program that goes into an
@@ -83,9 +84,9 @@
 ** no limit (and you'd better have a lot of memory).  This can also be
 ** set in the runtime config file.
 */
-#ifdef notdef
-#define CGI_LIMIT 50
-#endif
+//#ifdef notdef
+#define CGI_LIMIT 30
+//#endif
 
 /* CONFIGURE: How many seconds to allow for reading the initial request
 ** on a new connection.
@@ -136,7 +137,7 @@
 ** If you undefine this then thttpd will not implement authentication
 ** at all and will not check for auth files, which saves a bit of CPU time.
 */
-#define AUTH_FILE ".htpasswd"
+//#define AUTH_FILE ".htpasswd"
 
 /* CONFIGURE: The default character set name to use with text MIME types.
 ** This gets substituted into the MIME types where they have a "%s".
@@ -229,7 +230,7 @@
 ** without having to give the -P command line flag.  You can still disable
 ** it at runtime with the -noP flag.
 */
-#define ALWAYS_GLOBAL_PASSWD
+//#define ALWAYS_GLOBAL_PASSWD
 
 /* CONFIGURE: When started as root, the default username to switch to after
 ** initializing.  If this user (or the one specified by the -u flag) does
@@ -259,13 +260,13 @@
 ** is generated.  If ERR_DIR is not defined at all, only the built-in error
 ** pages will be generated.
 */
-#define ERR_DIR "errors"
+//#define ERR_DIR "errors"
 
 /* CONFIGURE: Define this if you want a standard HTML tail containing
 ** $SERVER_SOFTWARE and $SERVER_ADDRESS to be appended to the custom error
 ** pages.  (It is always appended to the built-in error pages.)
 */
-#define ERR_APPEND_SERVER_INFO
+//#define ERR_APPEND_SERVER_INFO
 
 /* CONFIGURE: nice(2) value to use for CGI programs.  If this is undefined,
 ** CGI programs run at normal priority.
@@ -289,7 +290,7 @@
 /* CONFIGURE: Seconds between stats syslogs.  If this is undefined then
 ** no stats are accumulated and no stats syslogs are done.
 */
-#define STATS_TIME 3600
+//#define STATS_TIME 3600
 
 /* CONFIGURE: The mmap cache tries to keep the total number of mapped
 ** files below this number, so you don't run out of kernel file descriptors.
@@ -346,7 +347,7 @@
 /* CONFIGURE: Whether to fflush() the log file after each request.  If
 ** this is turned off there's a slight savings in CPU cycles.
 */
-#define FLUSH_LOG_EVERY_TIME
+//#define FLUSH_LOG_EVERY_TIME
 
 /* CONFIGURE: Time between updates of the throttle table's rolling averages. */
 #define THROTTLE_TIME 2

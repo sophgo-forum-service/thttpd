@@ -117,12 +117,17 @@ typedef int socklen_t;
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* End of #ifdef __cplusplus */
 
 /* Forwards. */
 static void check_options( void );
 static void free_httpd_server( httpd_server* hs );
 static int initialize_listen_socket( httpd_sockaddr* saP );
-static void add_response( httpd_conn* hc, char* str );
+//static void add_response( httpd_conn* hc, char* str );
 static void send_mime( httpd_conn* hc, int status, char* title, char* encodings, char* extraheads, char* type, off_t length, time_t mod );
 static void send_response( httpd_conn* hc, int status, char* title, char* extraheads, char* form, char* arg );
 static void send_response_tail( httpd_conn* hc );
@@ -138,7 +143,7 @@ static int auth_check2( httpd_conn* hc, char* dirname  );
 #endif /* AUTH_FILE */
 static void send_dirredirect( httpd_conn* hc );
 static int hexit( char c );
-static void strdecode( char* to, char* from );
+//static void strdecode( char* to, char* from );
 #ifdef GENERATE_INDEXES
 static void strencode( char* to, int tosize, char* from );
 #endif /* GENERATE_INDEXES */
@@ -194,6 +199,12 @@ static long long atoll( const char* str );
 */
 static int sub_process = 0;
 
+static FUNC_CGI_HANDLE pFunc_cgi_handle = NULL;
+int CVI_THTTPD_RegisterCgiHandle(FUNC_CGI_HANDLE pfunInternalCgiProc)
+{
+    pFunc_cgi_handle = pfunInternalCgiProc;
+    return 0;
+}
 
 static void
 check_options( void )
@@ -533,8 +544,8 @@ char* httpd_err408form =
     "No request appeared within a reasonable time period.\n";
 
 static char* err451title = "Unavailable For Legal Reasons";
-static char* err451form =
-    "You do not have legal permission to get URL '%.80s' from this server.\n";
+//static char* err451form =
+//    "You do not have legal permission to get URL '%.80s' from this server.\n";
 
 static char* err500title = "Internal Error";
 static char* err500form =
@@ -550,7 +561,7 @@ char* httpd_err503form =
 
 
 /* Append a string to the buffer waiting to be sent as response. */
-static void
+void
 add_response( httpd_conn* hc, char* str )
     {
     size_t len;
@@ -1236,7 +1247,7 @@ hexit( char c )
 /* Copies and decodes a string.  It's ok for from and to to be the
 ** same string.
 */
-static void
+void
 strdecode( char* to, char* from )
     {
     for ( ; *from != '\0'; ++to, ++from )
@@ -1270,7 +1281,7 @@ strencode( char* to, int tosize, char* from )
 	    }
 	else
 	    {
-	    (void) sprintf( to, "%%%02x", (int) *from & 0xff );
+	    (void) snprintf( to,3, "%%%02x", (int) *from & 0xff );
 	    to += 3;
 	    tolen += 3;
 	    }
@@ -1482,7 +1493,8 @@ expand_symlinks( char* path, char** restP, int no_symlink_check, int tildemapped
 	** URL for the CGI instead of a local symlinked one.
 	*/
 	struct stat sb;
-	if ( stat( path, &sb ) != -1 )
+	if (( stat( path, &sb ) != -1 )
+        ||(NULL!=strstr(path,INTERNAL_CGI_PATTERN)))
 	    {
 	    checkedlen = strlen( path );
 	    httpd_realloc_str( &checked, &maxchecked, checkedlen );
@@ -2796,7 +2808,7 @@ ls( httpd_conn* hc )
 		    hc, 500, err500title, "", err500form, hc->encodedurl );
 		httpd_write_response( hc );
 		closedir( dirp );
-		exit( 1 );
+		_exit( 1 );
 		}
 
 	    (void) fprintf( fp, "\
@@ -2839,7 +2851,7 @@ mode  links    bytes  last-changed  name\n\
 		    if ( names == (char*) 0 || nameptrs == (char**) 0 )
 			{
 			syslog( LOG_ERR, "out of memory reallocating directory names" );
-			exit( 1 );
+			_exit( 1 );
 			}
 		    for ( i = 0; i < maxnames; ++i )
 			nameptrs[i] = &names[i * ( MAXPATHLEN + 1 )];
@@ -2971,7 +2983,7 @@ mode  links    bytes  last-changed  name\n\
 
 	    (void) fprintf( fp, "    </pre>\n  </body>\n</html>\n" );
 	    (void) fclose( fp );
-	    exit( 0 );
+	    _exit( 0 );
 	    }
 
 	/* Parent process. */
@@ -2983,7 +2995,7 @@ mode  links    bytes  last-changed  name\n\
 	if ( tmr_create( (struct timeval*) 0, cgi_kill, client_data, CGI_TIMELIMIT * 1000L, 0 ) == (Timer*) 0 )
 	    {
 	    syslog( LOG_CRIT, "tmr_create(cgi_kill ls) failed" );
-	    exit( 1 );
+	    return -1;
 	    }
 #endif /* CGI_TIMELIMIT */
 	hc->status = 200;
@@ -3264,8 +3276,9 @@ cgi_interpose_output( httpd_conn* hc, int rfd )
     {
     int r;
     char buf[1024];
-    size_t headers_size, headers_len;
-    char* headers;
+    size_t  headers_len;
+    char headers[1024+500];
+    //char* headers;
     char* br;
     int status;
     char* title;
@@ -3280,8 +3293,8 @@ cgi_interpose_output( httpd_conn* hc, int rfd )
     setsockopt(hc->conn_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags));
 
     /* Slurp in all headers. */
-    headers_size = 0;
-    httpd_realloc_str( &headers, &headers_size, 500 );
+    //headers_size = 0;
+    //httpd_realloc_str( &headers, &headers_size, 500 );
     headers_len = 0;
     for (;;)
 	{
@@ -3296,7 +3309,7 @@ cgi_interpose_output( httpd_conn* hc, int rfd )
 	    br = &(headers[headers_len]);
 	    break;
 	    }
-	httpd_realloc_str( &headers, &headers_size, headers_len + r );
+	//httpd_realloc_str( &headers, &headers_size, headers_len + r );
 	(void) memmove( &(headers[headers_len]), buf, r );
 	headers_len += r;
 	headers[headers_len] = '\0';
@@ -3401,7 +3414,7 @@ cgi_child( httpd_conn* hc )
     ** fd, and all of those are set to close-on-exec, so we don't
     ** have to close anything else.
     */
-    closelog();
+    //closelog();
 
     /* If the socket happens to be using one of the stdin/stdout/stderr
     ** descriptors, move it to another descriptor so that the dup2 calls
@@ -3625,6 +3638,7 @@ cgi( httpd_conn* hc )
     }
 
 
+
 static int
 really_start_request( httpd_conn* hc, struct timeval* nowP )
     {
@@ -3642,13 +3656,21 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
 
     expnlen = strlen( hc->expnfilename );
 
+    if((NULL != strstr(hc->expnfilename, INTERNAL_CGI_PATTERN)) &&
+		(NULL != pFunc_cgi_handle))
+    {
+        figure_mime( hc );
+		send_mime(hc, 200, ok200title, hc->encodings, "",hc->type, (off_t)-1, (time_t)0);
+        pFunc_cgi_handle(hc);
+		return 0;
+    }
     /* Stat the file. */
     if ( stat( hc->expnfilename, &hc->sb ) < 0 )
 	{
 	httpd_send_err( hc, 500, err500title, "", err500form, hc->encodedurl );
 	return -1;
 	}
-
+#if 0
     /* Is it world-readable or world-executable?  We check explicitly instead
     ** of just trying to open it, so that no one ever gets surprised by
     ** a file that's not set world-readable and yet somehow is
@@ -3666,7 +3688,7 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
 	    hc->encodedurl );
 	return -1;
 	}
-
+#endif
     /* Is it a directory? */
     if ( S_ISDIR(hc->sb.st_mode) )
 	{
@@ -3825,6 +3847,7 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
 	 match( hc->hs->cgi_pattern, hc->expnfilename ) )
 	return cgi( hc );
 
+#if 0 /*can click the file in any authority */
     /* It's not CGI.  If it's executable or there's pathinfo, someone's
     ** trying to either serve or run a non-CGI file as CGI.   Either case
     ** is prohibited.
@@ -3840,6 +3863,7 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
 	    hc->encodedurl );
 	return -1;
 	}
+#endif
     if ( hc->pathinfo[0] != '\0' )
 	{
 	syslog(
@@ -4282,3 +4306,9 @@ httpd_logstats( long secs )
 	    str_alloc_count, (unsigned long) str_alloc_size,
 	    (float) str_alloc_size / str_alloc_count );
     }
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* End of #ifdef __cplusplus */

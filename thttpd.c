@@ -60,6 +60,8 @@
 #include "timers.h"
 #include "match.h"
 
+#include "thttpd.h"
+
 #ifndef SHUT_WR
 #define SHUT_WR 1
 #endif
@@ -68,6 +70,11 @@
 typedef long long int64_t;
 #endif
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* End of #ifdef __cplusplus */
 
 static char* argv0;
 static int debug;
@@ -137,18 +144,21 @@ long stats_connections;
 off_t stats_bytes;
 int stats_simultaneous;
 
+char gDirPath[128] = {0};
+static int gChdirFlag = 0;
+
 static volatile int got_hup, got_usr1, watchdog_flag;
 
 
 /* Forwards. */
 static void parse_args( int argc, char** argv );
-static void usage( void );
-static void read_config( char* filename );
-static void value_required( char* name, char* value );
-static void no_value_required( char* name, char* value );
-static char* e_strdup( char* oldstr );
+//static void usage( void );
+//static void read_config( char* filename );
+//static void value_required( char* name, char* value );
+//static void no_value_required( char* name, char* value );
+//static char* e_strdup( char* oldstr );
 static void lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockaddr* sa6P, size_t sa6_len, int* gotv6P );
-static void read_throttlefile( char* tf );
+//static void read_throttlefile( char* tf );
 static void shut_down( void );
 static int handle_newconnect( struct timeval* tvP, int listen_fd );
 static void handle_read( connecttab* c, struct timeval* tvP );
@@ -170,7 +180,15 @@ static void show_stats( ClientData client_data, struct timeval* nowP );
 static void logstats( struct timeval* nowP );
 static void thttpd_logstats( long secs );
 
+int set_video_path(const char* path)
+{
+	gChdirFlag = 1;
+	memset(gDirPath, 0, sizeof(gDirPath));
+	memcpy(gDirPath, path, sizeof(gDirPath));
+	return 0;
+}
 
+#if 0
 /* SIGTERM and SIGINT say to exit immediately. */
 static void
 handle_term( int sig )
@@ -349,17 +367,19 @@ re_open_logfile( void )
 	httpd_set_logfp( hs, logfp );
 	}
     }
+#endif
 
 
-int
-main( int argc, char** argv )
+//int
+//main( int argc, char** argv )
+void* thttpd_start_main(void* pvParam)
     {
-    char* cp;
-    struct passwd* pwd;
-    uid_t uid = 32767;
-    gid_t gid = 32767;
+    //char* cp;
+    //struct passwd* pwd;
+    //uid_t uid = 32767;
+    //gid_t gid = 32767;
     char cwd[MAXPATHLEN+1];
-    FILE* logfp;
+    FILE* logfp = NULL;
     int num_ready;
     int cnum;
     connecttab* c;
@@ -368,18 +388,19 @@ main( int argc, char** argv )
     httpd_sockaddr sa6;
     int gotv4, gotv6;
     struct timeval tv;
+    prctl(PR_SET_NAME, (unsigned long)"thttpd-main", 0,0,0);
 
-    argv0 = argv[0];
+    //argv0 = argv[0];
 
-    cp = strrchr( argv0, '/' );
-    if ( cp != (char*) 0 )
-	++cp;
-    else
-	cp = argv0;
-    openlog( cp, LOG_NDELAY|LOG_PID, LOG_FACILITY );
+    //cp = strrchr( argv0, '/' );
+    //if ( cp != (char*) 0 )
+	//++cp;
+    //else
+	//cp = argv0;
+    //openlog( "thttpd", LOG_CONS|LOG_NDELAY|LOG_PID, LOG_LPR );
 
     /* Handle command-line arguments. */
-    parse_args( argc, argv );
+    parse_args( 0, NULL );
 
     /* Read zone info now, in case we chroot(). */
     tzset();
@@ -390,13 +411,14 @@ main( int argc, char** argv )
 	{
 	syslog( LOG_ERR, "can't find any valid address" );
 	(void) fprintf( stderr, "%s: can't find any valid address\n", argv0 );
-	exit( 1 );
+	return (void*)-1;
 	}
 
     /* Throttle file. */
     numthrottles = 0;
     maxthrottles = 0;
     throttles = (throttletab*) 0;
+#if 0
     if ( throttlefile != (char*) 0 )
 	read_throttlefile( throttlefile );
 
@@ -543,7 +565,7 @@ main( int argc, char** argv )
 	(void) fprintf( pidfp, "%d\n", (int) getpid() );
 	(void) fclose( pidfp );
 	}
-
+#endif
     /* Initialize the fdwatch package.  Have to do this before chroot,
     ** if /dev/poll is used.
     */
@@ -551,10 +573,21 @@ main( int argc, char** argv )
     if ( max_connects < 0 )
 	{
 	syslog( LOG_CRIT, "fdwatch initialization failure" );
-	exit( 1 );
+	return (void*)-1;
 	}
     max_connects -= SPARE_FDS;
 
+	if(gChdirFlag)
+	{
+		if ( chdir( gDirPath ) < 0 )
+		{
+			syslog( LOG_CRIT, "data_dir chdir - %m" );
+			perror( "data_dir chdir" );
+			return -1;
+		}
+	}
+	
+#if 0
     /* Chroot if requested. */
     if ( do_chroot )
 	{
@@ -630,7 +663,7 @@ main( int argc, char** argv )
     got_usr1 = 0;
     watchdog_flag = 0;
     (void) alarm( OCCASIONAL_TIME * 3 );
-
+#endif
     /* Initialize the timer package. */
     tmr_init();
 
@@ -644,19 +677,19 @@ main( int argc, char** argv )
 	no_symlink_check, do_vhost, do_global_passwd, url_pattern,
 	local_pattern, no_empty_referrers );
     if ( hs == (httpd_server*) 0 )
-	exit( 1 );
+    return (void*)-1;
 
     /* Set up the occasional timer. */
     if ( tmr_create( (struct timeval*) 0, occasional, JunkClientData, OCCASIONAL_TIME * 1000L, 1 ) == (Timer*) 0 )
 	{
 	syslog( LOG_CRIT, "tmr_create(occasional) failed" );
-	exit( 1 );
+	return (void*)-1;
 	}
     /* Set up the idle timer. */
     if ( tmr_create( (struct timeval*) 0, idle, JunkClientData, 5 * 1000L, 1 ) == (Timer*) 0 )
 	{
 	syslog( LOG_CRIT, "tmr_create(idle) failed" );
-	exit( 1 );
+	return (void*)-1;
 	}
     if ( numthrottles > 0 )
 	{
@@ -664,7 +697,7 @@ main( int argc, char** argv )
 	if ( tmr_create( (struct timeval*) 0, update_throttles, JunkClientData, THROTTLE_TIME * 1000L, 1 ) == (Timer*) 0 )
 	    {
 	    syslog( LOG_CRIT, "tmr_create(update_throttles) failed" );
-	    exit( 1 );
+        return (void*)-1;
 	    }
 	}
 #ifdef STATS_TIME
@@ -672,14 +705,14 @@ main( int argc, char** argv )
     if ( tmr_create( (struct timeval*) 0, show_stats, JunkClientData, STATS_TIME * 1000L, 1 ) == (Timer*) 0 )
 	{
 	syslog( LOG_CRIT, "tmr_create(show_stats) failed" );
-	exit( 1 );
+	return (void*)-1;
 	}
 #endif /* STATS_TIME */
     start_time = stats_time = time( (time_t*) 0 );
     stats_connections = 0;
     stats_bytes = 0;
     stats_simultaneous = 0;
-
+#if 0/*confict with ipcm*/
     /* If we're root, try to become someone else. */
     if ( getuid() == 0 )
 	{
@@ -714,13 +747,14 @@ main( int argc, char** argv )
 		LOG_WARNING,
 		"started as root without requesting chroot(), warning only" );
 	}
+#endif
 
     /* Initialize our connections table. */
     connects = NEW( connecttab, max_connects );
     if ( connects == (connecttab*) 0 )
 	{
 	syslog( LOG_CRIT, "out of memory allocating a connecttab" );
-	exit( 1 );
+	return (void*)-1;
 	}
     for ( cnum = 0; cnum < max_connects; ++cnum )
 	{
@@ -745,13 +779,14 @@ main( int argc, char** argv )
     (void) gettimeofday( &tv, (struct timezone*) 0 );
     while ( ( ! terminate ) || num_connects > 0 )
 	{
+#if 0
 	/* Do we need to re-open the log file? */
 	if ( got_hup )
 	    {
 	    re_open_logfile();
 	    got_hup = 0;
 	    }
-
+#endif
 	/* Do the fd watch. */
 	num_ready = fdwatch( tmr_mstimeout( &tv ) );
 	if ( num_ready < 0 )
@@ -759,7 +794,7 @@ main( int argc, char** argv )
 	    if ( errno == EINTR || errno == EAGAIN )
 		continue;       /* try again */
 	    syslog( LOG_ERR, "fdwatch - %m" );
-	    exit( 1 );
+        return (void*)-1;
 	    }
 	(void) gettimeofday( &tv, (struct timezone*) 0 );
 
@@ -810,7 +845,7 @@ main( int argc, char** argv )
 		    }
 	    }
 	tmr_run( &tv );
-
+#if 0
 	if ( got_usr1 && ! terminate )
 	    {
 	    terminate = 1;
@@ -823,20 +858,21 @@ main( int argc, char** argv )
 		httpd_unlisten( hs );
 		}
 	    }
+#endif
 	}
 
     /* The main loop terminated. */
     shut_down();
     syslog( LOG_NOTICE, "exiting" );
-    closelog();
-    exit( 0 );
+    //closelog();
+	return 0;
     }
 
 
 static void
 parse_args( int argc, char** argv )
     {
-    int argn;
+    //int argn;
 
     debug = 0;
     port = DEFAULT_PORT;
@@ -880,6 +916,9 @@ parse_args( int argc, char** argv )
     charset = DEFAULT_CHARSET;
     p3p = "";
     max_age = -1;
+    debug = 1;
+    no_symlink_check = 1;
+#if 0
     argn = 1;
     while ( argn < argc && argv[argn][0] == '-' )
 	{
@@ -983,9 +1022,10 @@ parse_args( int argc, char** argv )
 	}
     if ( argn != argc )
 	usage();
+#endif
     }
 
-
+#if 0
 static void
 usage( void )
     {
@@ -1221,7 +1261,7 @@ e_strdup( char* oldstr )
 	}
     return newstr;
     }
-
+#endif
 
 static void
 lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockaddr* sa6P, size_t sa6_len, int* gotv6P )
@@ -1249,7 +1289,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 	(void) fprintf(
 	    stderr, "%s: getaddrinfo %s - %s\n",
 	    argv0, hostname, gai_strerror( gaierr ) );
-	exit( 1 );
+	return;
 	}
 
     /* Find the first IPv6 and IPv4 entries. */
@@ -1280,7 +1320,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 		LOG_CRIT, "%.80s - sockaddr too small (%lu < %lu)",
 		hostname, (unsigned long) sa6_len,
 		(unsigned long) aiv6->ai_addrlen );
-	    exit( 1 );
+        return;
 	    }
 	(void) memset( sa6P, 0, sa6_len );
 	(void) memmove( sa6P, aiv6->ai_addr, aiv6->ai_addrlen );
@@ -1297,7 +1337,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 		LOG_CRIT, "%.80s - sockaddr too small (%lu < %lu)",
 		hostname, (unsigned long) sa4_len,
 		(unsigned long) aiv4->ai_addrlen );
-	    exit( 1 );
+        return;
 	    }
 	(void) memset( sa4P, 0, sa4_len );
 	(void) memmove( sa4P, aiv4->ai_addr, aiv4->ai_addrlen );
@@ -1336,7 +1376,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 		(void) fprintf(
 		    stderr, "%s: gethostbyname %s failed\n", argv0, hostname );
 #endif /* HAVE_HSTRERROR */
-		exit( 1 );
+        return;
 		}
 	    if ( he->h_addrtype != AF_INET )
 		{
@@ -1344,7 +1384,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 		(void) fprintf(
 		    stderr, "%s: %s - non-IP network address\n",
 		    argv0, hostname );
-		exit( 1 );
+        return;
 		}
 	    (void) memmove(
 		&sa4P->sa_in.sin_addr.s_addr, he->h_addr, he->h_length );
@@ -1356,7 +1396,7 @@ lookup_hostname( httpd_sockaddr* sa4P, size_t sa4_len, int* gotv4P, httpd_sockad
 #endif /* USE_IPV6 */
     }
 
-
+#if 0
 static void
 read_throttlefile( char* tf )
     {
@@ -1452,7 +1492,7 @@ read_throttlefile( char* tf )
 	}
     (void) fclose( fp );
     }
-
+#endif
 
 static void
 shut_down( void )
@@ -1496,7 +1536,7 @@ static int
 handle_newconnect( struct timeval* tvP, int listen_fd )
     {
     connecttab* c;
-    ClientData client_data;
+    //ClientData client_data;
 
     /* This loops until the accept() fails, trying to start new
     ** connections as fast as possible so we don't overrun the
@@ -1519,7 +1559,7 @@ handle_newconnect( struct timeval* tvP, int listen_fd )
 	if ( first_free_connect == -1 || connects[first_free_connect].conn_state != CNST_FREE )
 	    {
 	    syslog( LOG_CRIT, "the connects free list is messed up" );
-	    exit( 1 );
+	    return -1;
 	    }
 	c = &connects[first_free_connect];
 	/* Make the httpd_conn if necessary. */
@@ -1529,7 +1569,7 @@ handle_newconnect( struct timeval* tvP, int listen_fd )
 	    if ( c->hc == (httpd_conn*) 0 )
 		{
 		syslog( LOG_CRIT, "out of memory allocating an httpd_conn" );
-		exit( 1 );
+	    return -1;
 		}
 	    c->hc->initialized = 0;
 	    ++httpd_conn_count;
@@ -1554,7 +1594,7 @@ handle_newconnect( struct timeval* tvP, int listen_fd )
 	first_free_connect = c->next_free_connect;
 	c->next_free_connect = -1;
 	++num_connects;
-	client_data.p = c;
+	//client_data.p = c;
 	c->active_at = tvP->tv_sec;
 	c->wakeup_timer = (Timer*) 0;
 	c->linger_timer = (Timer*) 0;
@@ -1688,7 +1728,7 @@ handle_read( connecttab* c, struct timeval* tvP )
     c->conn_state = CNST_SENDING;
     c->started_at = tvP->tv_sec;
     c->wouldblock_delay = 0;
-    client_data.p = c;
+    //client_data.p = c;
 
     fdwatch_del_fd( hc->conn_fd );
     fdwatch_add_fd( hc->conn_fd, c, FDW_WRITE );
@@ -1759,7 +1799,7 @@ handle_send( connecttab* c, struct timeval* tvP )
 	if ( c->wakeup_timer == (Timer*) 0 )
 	    {
 	    syslog( LOG_CRIT, "tmr_create(wakeup_connection) failed" );
-	    exit( 1 );
+        return;
 	    }
 	return;
 	}
@@ -1845,7 +1885,7 @@ handle_send( connecttab* c, struct timeval* tvP )
 	    if ( c->wakeup_timer == (Timer*) 0 )
 		{
 		syslog( LOG_CRIT, "tmr_create(wakeup_connection) failed" );
-		exit( 1 );
+        return;
 		}
 	    }
 	}
@@ -2027,7 +2067,7 @@ clear_connection( connecttab* c, struct timeval* tvP )
 	if ( c->linger_timer == (Timer*) 0 )
 	    {
 	    syslog( LOG_CRIT, "tmr_create(linger_clear_connection) failed" );
-	    exit( 1 );
+        return;
 	    }
 	}
     else
@@ -2122,7 +2162,7 @@ occasional( ClientData client_data, struct timeval* nowP )
     {
     mmc_cleanup( nowP );
     tmr_cleanup();
-    watchdog_flag = 1;		/* let the watchdog know that we are alive */
+    //watchdog_flag = 1;		/* let the watchdog know that we are alive */
     }
 
 
@@ -2179,3 +2219,9 @@ thttpd_logstats( long secs )
     stats_bytes = 0;
     stats_simultaneous = 0;
     }
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* End of #ifdef __cplusplus */
